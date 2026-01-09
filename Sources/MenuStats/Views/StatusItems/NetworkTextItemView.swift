@@ -9,20 +9,22 @@ struct NetworkTextItemView: View {
 
             Spacer(minLength: 0)
 
-            VStack(alignment: .trailing, spacing: 0) {
-                HStack(spacing: 1) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 0) {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 6))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 2)
                     Text(ByteFormatter.formatCompact(metrics.bytesSentPerSecond))
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(.primary)
                 }
 
-                HStack(spacing: 1) {
+                HStack(spacing: 0) {
                     Image(systemName: "arrow.down")
                         .font(.system(size: 6))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 2)
                     Text(ByteFormatter.formatCompact(metrics.bytesReceivedPerSecond))
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(.primary)
