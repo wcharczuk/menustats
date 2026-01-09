@@ -13,12 +13,13 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
     private var memoryStatusItem: NSStatusItem?
     private var networkStatusItem: NSStatusItem?
     private var diskStatusItem: NSStatusItem?
+    private var dynamicStatusItem: NSStatusItem?
 
     private var observationTask: Task<Void, Never>?
     private var preferencesWindow: NSWindow?
 
     private enum MenuType {
-        case cpu, memory, network, disk
+        case cpu, memory, network, disk, dynamic
     }
     private var menuTypeMap: [NSMenu: MenuType] = [:]
 
@@ -90,7 +91,7 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
             }
         }
 
-        // Network (leftmost)
+        // Network
         if settings.networkEnabled && settings.networkDisplayMode != .hidden {
             if networkStatusItem == nil {
                 networkStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -101,6 +102,20 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
                 if let menu = item.menu { menuTypeMap.removeValue(forKey: menu) }
                 NSStatusBar.system.removeStatusItem(item)
                 networkStatusItem = nil
+            }
+        }
+
+        // Dynamic (leftmost)
+        if settings.dynamicEnabled {
+            if dynamicStatusItem == nil {
+                dynamicStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                setupStatusItemMenu(dynamicStatusItem, type: .dynamic)
+            }
+        } else {
+            if let item = dynamicStatusItem {
+                if let menu = item.menu { menuTypeMap.removeValue(forKey: menu) }
+                NSStatusBar.system.removeStatusItem(item)
+                dynamicStatusItem = nil
             }
         }
     }
@@ -124,6 +139,7 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         case .memory: populateMemoryMenu(menu)
         case .network: populateNetworkMenu(menu)
         case .disk: populateDiskMenu(menu)
+        case .dynamic: populateDynamicMenu(menu)
         }
     }
 
@@ -132,6 +148,7 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         updateMemoryStatusItem()
         updateNetworkStatusItem()
         updateDiskStatusItem()
+        updateDynamicStatusItem()
     }
 
     private func updateCPUStatusItem() {
@@ -263,6 +280,28 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         case .hidden:
             break
         }
+    }
+
+    private func updateDynamicStatusItem() {
+        guard let statusItem = dynamicStatusItem else { return }
+
+        let rootView = DynamicStatusItemView(
+            cpuMetrics: systemMonitor.cpuMetrics,
+            memoryMetrics: systemMonitor.memoryMetrics,
+            networkMetrics: systemMonitor.networkMetrics,
+            diskMetrics: systemMonitor.diskMetrics,
+            cpuThreshold: settings.cpuThreshold,
+            memoryThreshold: settings.memoryThreshold,
+            networkThreshold: settings.networkThreshold,
+            diskThreshold: settings.diskThreshold
+        )
+        let view = NSHostingView(rootView: rootView)
+        let fittingSize = view.fittingSize
+        view.frame = NSRect(x: 0, y: 0, width: max(fittingSize.width, 22), height: 22)
+        statusItem.button?.subviews.forEach { $0.removeFromSuperview() }
+        statusItem.button?.addSubview(view)
+        statusItem.button?.title = ""
+        statusItem.length = max(fittingSize.width, 22)
     }
 
     // MARK: - Menu Population
@@ -457,6 +496,119 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         )
         totalItem.isEnabled = false
         menu.addItem(totalItem)
+
+        addCommonMenuItems(to: menu)
+    }
+
+    private func populateDynamicMenu(_ menu: NSMenu) {
+        // Header
+        let headerItem = NSMenuItem(title: "System Status", action: nil, keyEquivalent: "")
+        headerItem.isEnabled = false
+        menu.addItem(headerItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Check each metric and add status
+        let cpuMetrics = systemMonitor.cpuMetrics
+        let memoryMetrics = systemMonitor.memoryMetrics
+        let networkMetrics = systemMonitor.networkMetrics
+        let diskMetrics = systemMonitor.diskMetrics
+
+        var hasIssues = false
+
+        // CPU status
+        if settings.cpuThreshold.isCritical(cpuMetrics.totalUsage) {
+            let item = NSMenuItem(
+                title: String(format: "⚠ CPU Critical: %.1f%%", cpuMetrics.totalUsage),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.addItem(item)
+            hasIssues = true
+        } else if settings.cpuThreshold.isWarning(cpuMetrics.totalUsage) {
+            let item = NSMenuItem(
+                title: String(format: "● CPU Warning: %.1f%%", cpuMetrics.totalUsage),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.addItem(item)
+            hasIssues = true
+        }
+
+        // Memory status
+        if settings.memoryThreshold.isCritical(memoryMetrics.usagePercentage) {
+            let item = NSMenuItem(
+                title: String(format: "⚠ Memory Critical: %.1f%%", memoryMetrics.usagePercentage),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.addItem(item)
+            hasIssues = true
+        } else if settings.memoryThreshold.isWarning(memoryMetrics.usagePercentage) {
+            let item = NSMenuItem(
+                title: String(format: "● Memory Warning: %.1f%%", memoryMetrics.usagePercentage),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.addItem(item)
+            hasIssues = true
+        }
+
+        // Network status (same logic as in DynamicStatusItemView)
+        let maxNetworkMBps = max(
+            Double(networkMetrics.bytesSentPerSecond),
+            Double(networkMetrics.bytesReceivedPerSecond)
+        ) / (1024 * 1024)
+        if settings.networkThreshold.isCritical(maxNetworkMBps) {
+            let item = NSMenuItem(
+                title: String(format: "⚠ Network Critical: %.1f MB/s", maxNetworkMBps),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.addItem(item)
+            hasIssues = true
+        } else if settings.networkThreshold.isWarning(maxNetworkMBps) {
+            let item = NSMenuItem(
+                title: String(format: "● Network Warning: %.1f MB/s", maxNetworkMBps),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.addItem(item)
+            hasIssues = true
+        }
+
+        // Disk status
+        if settings.diskThreshold.isCritical(diskMetrics.usagePercentage) {
+            let item = NSMenuItem(
+                title: String(format: "⚠ Disk Critical: %.1f%%", diskMetrics.usagePercentage),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.addItem(item)
+            hasIssues = true
+        } else if settings.diskThreshold.isWarning(diskMetrics.usagePercentage) {
+            let item = NSMenuItem(
+                title: String(format: "● Disk Warning: %.1f%%", diskMetrics.usagePercentage),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.addItem(item)
+            hasIssues = true
+        }
+
+        if !hasIssues {
+            let item = NSMenuItem(title: "✓ All systems normal", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        }
 
         addCommonMenuItems(to: menu)
     }

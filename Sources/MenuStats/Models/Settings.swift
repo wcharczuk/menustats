@@ -7,11 +7,6 @@ enum MetricDisplayMode: String, CaseIterable, Codable {
     case hidden
 }
 
-enum VisibilityMode: String, CaseIterable, Codable {
-    case alwaysShow
-    case dynamic
-}
-
 @Observable
 @MainActor
 final class AppSettings {
@@ -19,10 +14,6 @@ final class AppSettings {
 
     var updateInterval: TimeInterval {
         didSet { UserDefaults.standard.set(updateInterval, forKey: "updateInterval") }
-    }
-
-    var visibilityMode: VisibilityMode {
-        didSet { UserDefaults.standard.set(visibilityMode.rawValue, forKey: "visibilityMode") }
     }
 
     var launchAtLogin: Bool {
@@ -45,6 +36,10 @@ final class AppSettings {
 
     var diskEnabled: Bool {
         didSet { UserDefaults.standard.set(diskEnabled, forKey: "diskEnabled") }
+    }
+
+    var dynamicEnabled: Bool {
+        didSet { UserDefaults.standard.set(dynamicEnabled, forKey: "dynamicEnabled") }
     }
 
     // MARK: - Display Modes
@@ -89,13 +84,13 @@ final class AppSettings {
         let defaults = UserDefaults.standard
 
         self.updateInterval = defaults.object(forKey: "updateInterval") as? TimeInterval ?? 2.0
-        self.visibilityMode = VisibilityMode(rawValue: defaults.string(forKey: "visibilityMode") ?? "") ?? .alwaysShow
         self.launchAtLogin = defaults.bool(forKey: "launchAtLogin")
 
         self.cpuEnabled = defaults.object(forKey: "cpuEnabled") as? Bool ?? true
         self.memoryEnabled = defaults.object(forKey: "memoryEnabled") as? Bool ?? true
         self.networkEnabled = defaults.object(forKey: "networkEnabled") as? Bool ?? true
         self.diskEnabled = defaults.object(forKey: "diskEnabled") as? Bool ?? true
+        self.dynamicEnabled = defaults.object(forKey: "dynamicEnabled") as? Bool ?? true
 
         self.cpuDisplayMode = MetricDisplayMode(rawValue: defaults.string(forKey: "cpuDisplayMode") ?? "") ?? .graph
         self.memoryDisplayMode = MetricDisplayMode(rawValue: defaults.string(forKey: "memoryDisplayMode") ?? "") ?? .graph

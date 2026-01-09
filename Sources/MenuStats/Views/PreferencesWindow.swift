@@ -21,6 +21,7 @@ struct PreferencesWindow: View {
                     Label("Thresholds", systemImage: "slider.horizontal.3")
                 }
         }
+        .scenePadding()
         .frame(minWidth: 450, minHeight: 400)
     }
 }
@@ -38,11 +39,6 @@ struct GeneralSettingsView: View {
                     Text("2 seconds").tag(2.0 as TimeInterval)
                     Text("5 seconds").tag(5.0 as TimeInterval)
                     Text("10 seconds").tag(10.0 as TimeInterval)
-                }
-
-                Picker("Visibility Mode", selection: $settings.visibilityMode) {
-                    Text("Always Show").tag(VisibilityMode.alwaysShow)
-                    Text("Dynamic").tag(VisibilityMode.dynamic)
                 }
             } header: {
                 Text("Display")
@@ -64,7 +60,6 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .padding()
     }
 }
 
@@ -122,9 +117,17 @@ struct MetricsSettingsView: View {
             } header: {
                 Text("Disk")
             }
+
+            Section {
+                Toggle("Enable Dynamic Indicator", isOn: $settings.dynamicEnabled)
+                Text("Shows which metrics are approaching or exceeding thresholds")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Dynamic")
+            }
         }
         .formStyle(.grouped)
-        .padding()
     }
 }
 
@@ -160,7 +163,6 @@ struct ThresholdsSettingsView: View {
             )
         }
         .formStyle(.grouped)
-        .padding()
     }
 }
 

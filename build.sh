@@ -25,6 +25,25 @@ mkdir -p "$BUNDLE_DIR/Contents/Resources"
 # Copy executable
 cp "$BUILD_DIR/$APP_NAME" "$BUNDLE_DIR/Contents/MacOS/"
 
+# Generate app icon
+echo "Generating app icon..."
+ICONSET_DIR="Sources/MenuStats/Resources/Assets.xcassets/AppIcon.appiconset"
+ICONSET_TEMP=".build/AppIcon.iconset"
+rm -rf "$ICONSET_TEMP"
+mkdir -p "$ICONSET_TEMP"
+cp "$ICONSET_DIR"/icon_16x16.png "$ICONSET_TEMP/icon_16x16.png"
+cp "$ICONSET_DIR"/icon_16x16@2x.png "$ICONSET_TEMP/icon_16x16@2x.png"
+cp "$ICONSET_DIR"/icon_32x32.png "$ICONSET_TEMP/icon_32x32.png"
+cp "$ICONSET_DIR"/icon_32x32@2x.png "$ICONSET_TEMP/icon_32x32@2x.png"
+cp "$ICONSET_DIR"/icon_128x128.png "$ICONSET_TEMP/icon_128x128.png"
+cp "$ICONSET_DIR"/icon_128x128@2x.png "$ICONSET_TEMP/icon_128x128@2x.png"
+cp "$ICONSET_DIR"/icon_256x256.png "$ICONSET_TEMP/icon_256x256.png"
+cp "$ICONSET_DIR"/icon_256x256@2x.png "$ICONSET_TEMP/icon_256x256@2x.png"
+cp "$ICONSET_DIR"/icon_512x512.png "$ICONSET_TEMP/icon_512x512.png"
+cp "$ICONSET_DIR"/icon_512x512@2x.png "$ICONSET_TEMP/icon_512x512@2x.png"
+iconutil -c icns "$ICONSET_TEMP" -o "$BUNDLE_DIR/Contents/Resources/AppIcon.icns"
+rm -rf "$ICONSET_TEMP"
+
 # Create Info.plist
 cat > "$BUNDLE_DIR/Contents/Info.plist" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -39,6 +58,8 @@ cat > "$BUNDLE_DIR/Contents/Info.plist" << 'EOF'
     <string>com.menustats.app</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleName</key>
     <string>MenuStats</string>
     <key>CFBundlePackageType</key>

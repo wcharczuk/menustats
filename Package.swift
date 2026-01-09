@@ -13,6 +13,9 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MenuStats",
+            resources: [
+                .process("Resources/Assets.xcassets")
+            ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
