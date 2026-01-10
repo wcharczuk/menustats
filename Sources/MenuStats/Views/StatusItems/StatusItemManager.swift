@@ -293,7 +293,10 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
             cpuThreshold: settings.cpuThreshold,
             memoryThreshold: settings.memoryThreshold,
             networkThreshold: settings.networkThreshold,
-            diskThreshold: settings.diskThreshold
+            diskThreshold: settings.diskThreshold,
+            outlierDetectionEnabled: settings.dynamicOutlierDetectionEnabled,
+            stdDevThreshold: settings.dynamicStdDevThreshold,
+            minHistoryCount: settings.dynamicMinHistoryCount
         )
         let view = NSHostingView(rootView: rootView)
         let fittingSize = view.fittingSize

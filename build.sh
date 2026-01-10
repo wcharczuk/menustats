@@ -97,24 +97,5 @@ echo ""
 echo "App bundle created at:"
 echo "  $BUNDLE_DIR"
 echo ""
-echo "To install, first quit the running app, then run:"
-echo "  pkill -f MenuStats; rm -rf /Applications/MenuStats.app && cp -r \"$BUNDLE_DIR\" /Applications/"
-echo ""
-echo "Or to install now (will quit running app):"
-read -p "Install to /Applications? [y/N] " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "Installing..."
-    pkill -f MenuStats 2>/dev/null || true
-    sleep 0.5
-    rm -rf /Applications/MenuStats.app
-    cp -r "$BUNDLE_DIR" /Applications/
-    echo "Installed to /Applications/MenuStats.app"
-    echo ""
-    read -p "Launch MenuStats now? [y/N] " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        open /Applications/MenuStats.app
-    fi
-fi
-echo ""
+echo "To install, run:"
+echo "  ./install.sh"

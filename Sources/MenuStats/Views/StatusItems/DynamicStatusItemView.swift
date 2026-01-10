@@ -17,9 +17,11 @@ struct DynamicStatusItemView: View {
     let memoryThreshold: ThresholdConfig
     let networkThreshold: ThresholdConfig
     let diskThreshold: ThresholdConfig
+    let outlierDetectionEnabled: Bool
+    let stdDevThreshold: Double
+    let minHistoryCount: Int
 
     private static let outlierColor = Color.orange
-    private static let stdDevThreshold = 4.0
 
     private var alerts: [DynamicAlertInfo] {
         var result: [DynamicAlertInfo] = []
@@ -115,7 +117,8 @@ struct DynamicStatusItemView: View {
     }
 
     private func isOutlier(value: Double, history: [Double]) -> Bool {
-        guard history.count >= 10 else { return false }
+        guard outlierDetectionEnabled else { return false }
+        guard history.count >= minHistoryCount else { return false }
 
         let mean = history.reduce(0, +) / Double(history.count)
         let variance = history.map { pow($0 - mean, 2) }.reduce(0, +) / Double(history.count)
@@ -124,7 +127,7 @@ struct DynamicStatusItemView: View {
         guard stdDev > 0.1 else { return false }
 
         let deviations = abs(value - mean) / stdDev
-        return deviations > Self.stdDevThreshold
+        return deviations > stdDevThreshold
     }
 
     var body: some View {

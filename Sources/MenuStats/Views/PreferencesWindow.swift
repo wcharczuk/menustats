@@ -16,6 +16,11 @@ struct PreferencesWindow: View {
                     Label("Metrics", systemImage: "chart.bar")
                 }
 
+            DynamicSettingsView()
+                .tabItem {
+                    Label("Dynamic", systemImage: "waveform.path.ecg")
+                }
+
             ThresholdsSettingsView()
                 .tabItem {
                     Label("Thresholds", systemImage: "slider.horizontal.3")
@@ -118,17 +123,98 @@ struct MetricsSettingsView: View {
             } header: {
                 Text("Disk")
             }
+        }
+        .formStyle(.grouped)
+    }
+}
 
+struct DynamicSettingsView: View {
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        @Bindable var settings = settings
+
+        Form {
             Section {
                 Toggle("Enable Dynamic Indicator", isOn: $settings.dynamicEnabled)
                 Text("Shows which metrics are approaching or exceeding thresholds")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                Text("Dynamic")
+                Text("Dynamic Indicator")
+            }
+
+            if settings.dynamicEnabled {
+                Section {
+                    Toggle("Enable Outlier Detection", isOn: $settings.dynamicOutlierDetectionEnabled)
+                    Text("Highlight metrics with unusual activity based on recent history")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if settings.dynamicOutlierDetectionEnabled {
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        HStack {
+                            Text("Sensitivity")
+                            Spacer()
+                            Text(sensitivityLabel(for: settings.dynamicStdDevThreshold))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 4) {
+                                HStack {
+                                    Text("More")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    TickSlider(
+                                        value: $settings.dynamicStdDevThreshold,
+                                        range: 2.0...6.0,
+                                        tickMarks: 5,
+                                        tickLabels: ["2σ", "3σ", "4σ", "5σ", "6σ"]
+                                    )
+                                    .frame(width: 200)
+                                    Text("Less")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text("Standard deviations from mean required to trigger")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        Stepper(
+                            "Minimum Samples: \(settings.dynamicMinHistoryCount)",
+                            value: $settings.dynamicMinHistoryCount,
+                            in: 5...30
+                        )
+                        Text("Number of samples required before outlier detection activates")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Outlier Detection")
+                }
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func sensitivityLabel(for stdDev: Double) -> String {
+        switch stdDev {
+        case ..<2.5: return "Very High"
+        case 2.5..<3.5: return "High"
+        case 3.5..<4.5: return "Medium"
+        case 4.5..<5.5: return "Low"
+        default: return "Very Low"
+        }
     }
 }
 
@@ -154,7 +240,7 @@ struct ThresholdsSettingsView: View {
             ThresholdSection(
                 title: "Network",
                 threshold: $settings.networkThreshold,
-                unit: "% of activity"
+                unit: "%"
             )
 
             ThresholdSection(
@@ -174,51 +260,236 @@ struct ThresholdSection: View {
 
     var body: some View {
         Section {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Current values display
                 HStack {
-                    Text("Normal")
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.primary.opacity(0.5)).frame(width: 8, height: 8)
+                        Text("Normal: <\(Int(threshold.greenMax))\(unit)")
+                            .font(.caption)
+                    }
                     Spacer()
-                    Text("< \(Int(threshold.greenMax))\(unit)")
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.blue).frame(width: 8, height: 8)
+                        Text("Warning: \(Int(threshold.greenMax))-\(Int(threshold.yellowMax))\(unit)")
+                            .font(.caption)
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.purple).frame(width: 8, height: 8)
+                        Text("Critical: >\(Int(threshold.yellowMax))\(unit)")
+                            .font(.caption)
+                    }
                 }
 
-                Slider(value: $threshold.greenMax, in: 0...100, step: 5)
-
-                HStack {
-                    Text("Warning")
-                    Spacer()
-                    Text("\(Int(threshold.greenMax)) - \(Int(threshold.yellowMax))\(unit)")
-                        .foregroundStyle(.blue)
-                }
-
-                Slider(value: $threshold.yellowMax, in: threshold.greenMax...100, step: 5)
-
-                HStack {
-                    Text("Critical")
-                    Spacer()
-                    Text("> \(Int(threshold.yellowMax))\(unit)")
-                        .foregroundStyle(.purple)
-                }
+                // Dual thumb slider
+                DualThumbSlider(
+                    warningValue: $threshold.greenMax,
+                    criticalValue: $threshold.yellowMax,
+                    range: 0...100
+                )
+                .frame(height: 44)
             }
-
-            // Preview bar
-            HStack(spacing: 2) {
-                Rectangle()
-                    .fill(.primary.opacity(0.5))
-                    .frame(width: CGFloat(threshold.greenMax) * 2)
-
-                Rectangle()
-                    .fill(.blue)
-                    .frame(width: CGFloat(threshold.yellowMax - threshold.greenMax) * 2)
-
-                Rectangle()
-                    .fill(.purple)
-                    .frame(width: CGFloat(100 - threshold.yellowMax) * 2)
-            }
-            .frame(height: 10)
-            .clipShape(RoundedRectangle(cornerRadius: 3))
         } header: {
             Text(title)
+        }
+    }
+}
+
+struct DualThumbSlider: View {
+    @Binding var warningValue: Double
+    @Binding var criticalValue: Double
+    let range: ClosedRange<Double>
+
+    private let trackHeight: CGFloat = 6
+    private let thumbSize: CGFloat = 18
+
+    var body: some View {
+        GeometryReader { geometry in
+            let trackWidth = geometry.size.width - thumbSize
+            let warningPosition = thumbSize / 2 + (warningValue - range.lowerBound) / (range.upperBound - range.lowerBound) * trackWidth
+            let criticalPosition = thumbSize / 2 + (criticalValue - range.lowerBound) / (range.upperBound - range.lowerBound) * trackWidth
+
+            VStack(spacing: 4) {
+                ZStack(alignment: .leading) {
+                    // Track background segments
+                    HStack(spacing: 0) {
+                        // Normal segment (0 to warning)
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.3))
+                            .frame(width: max(0, warningPosition - thumbSize / 2))
+
+                        // Warning segment (warning to critical)
+                        Rectangle()
+                            .fill(Color.blue)
+                            .frame(width: max(0, criticalPosition - warningPosition))
+
+                        // Critical segment (critical to 100)
+                        Rectangle()
+                            .fill(Color.purple)
+                    }
+                    .frame(height: trackHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: trackHeight / 2))
+                    .padding(.horizontal, thumbSize / 2)
+
+                    // Warning thumb
+                    Circle()
+                        .fill(Color.white)
+                        .overlay(Circle().stroke(Color.blue, lineWidth: 2))
+                        .frame(width: thumbSize, height: thumbSize)
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                        .position(x: warningPosition, y: geometry.size.height / 2 - 10)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    let newValue = valueFromPosition(value.location.x, trackWidth: trackWidth)
+                                    warningValue = min(newValue, criticalValue - 1)
+                                }
+                        )
+
+                    // Critical thumb
+                    Circle()
+                        .fill(Color.white)
+                        .overlay(Circle().stroke(Color.purple, lineWidth: 2))
+                        .frame(width: thumbSize, height: thumbSize)
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                        .position(x: criticalPosition, y: geometry.size.height / 2 - 10)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    let newValue = valueFromPosition(value.location.x, trackWidth: trackWidth)
+                                    criticalValue = max(newValue, warningValue + 1)
+                                }
+                        )
+                }
+                .frame(height: thumbSize + 4)
+
+                // Min/max labels
+                HStack {
+                    Text("0%")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("100%")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func valueFromPosition(_ x: CGFloat, trackWidth: CGFloat) -> Double {
+        let clampedX = max(thumbSize / 2, min(x, trackWidth + thumbSize / 2))
+        let percentage = (clampedX - thumbSize / 2) / trackWidth
+        let value = range.lowerBound + percentage * (range.upperBound - range.lowerBound)
+        return value.rounded() // Snap to 1% increments
+    }
+}
+
+struct TickSlider: NSViewRepresentable {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let tickMarks: Int
+    let tickLabels: [String]
+
+    func makeNSView(context: Context) -> NSView {
+        let container = TickSliderContainer(
+            value: value,
+            range: range,
+            tickMarks: tickMarks,
+            tickLabels: tickLabels,
+            coordinator: context.coordinator
+        )
+        return container
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let container = nsView as? TickSliderContainer {
+            container.slider.doubleValue = value
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    @MainActor
+    class Coordinator: NSObject {
+        var parent: TickSlider
+
+        init(_ parent: TickSlider) {
+            self.parent = parent
+        }
+
+        @objc func valueChanged(_ sender: NSSlider) {
+            parent.value = sender.doubleValue
+        }
+    }
+}
+
+class TickSliderContainer: NSView {
+    let slider: NSSlider
+    let tickLabels: [String]
+    let tickMarks: Int
+    private var labelViews: [NSTextField] = []
+
+    init(value: Double, range: ClosedRange<Double>, tickMarks: Int, tickLabels: [String], coordinator: TickSlider.Coordinator) {
+        self.tickLabels = tickLabels
+        self.tickMarks = tickMarks
+        self.slider = NSSlider(value: value, minValue: range.lowerBound, maxValue: range.upperBound, target: coordinator, action: #selector(TickSlider.Coordinator.valueChanged(_:)))
+
+        super.init(frame: .zero)
+
+        slider.numberOfTickMarks = tickMarks
+        slider.allowsTickMarkValuesOnly = true
+        slider.tickMarkPosition = .below
+        slider.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(slider)
+
+        NSLayoutConstraint.activate([
+            slider.topAnchor.constraint(equalTo: topAnchor),
+            slider.leadingAnchor.constraint(equalTo: leadingAnchor),
+            slider.trailingAnchor.constraint(equalTo: trailingAnchor)
+        ])
+
+        // Create labels
+        for labelText in tickLabels {
+            let label = NSTextField(labelWithString: labelText)
+            label.font = NSFont.systemFont(ofSize: 9)
+            label.textColor = NSColor.tertiaryLabelColor
+            label.alignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(label)
+            labelViews.append(label)
+
+            NSLayoutConstraint.activate([
+                label.topAnchor.constraint(equalTo: slider.bottomAnchor, constant: 2)
+            ])
+        }
+
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(equalToConstant: 40)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layout() {
+        super.layout()
+
+        // Position labels based on actual slider frame
+        let sliderFrame = slider.frame
+        let knobInset: CGFloat = 4  // Approximate inset for the slider knob
+
+        for (index, label) in labelViews.enumerated() {
+            let fraction = CGFloat(index) / CGFloat(max(tickMarks - 1, 1))
+            let trackWidth = sliderFrame.width - (knobInset * 2)
+            let xPosition = sliderFrame.minX + knobInset + (fraction * trackWidth)
+            label.sizeToFit()
+            label.frame.origin.x = xPosition - (label.frame.width / 2)
         }
     }
 }

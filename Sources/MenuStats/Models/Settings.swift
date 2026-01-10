@@ -42,6 +42,18 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(dynamicEnabled, forKey: "dynamicEnabled") }
     }
 
+    var dynamicOutlierDetectionEnabled: Bool {
+        didSet { UserDefaults.standard.set(dynamicOutlierDetectionEnabled, forKey: "dynamicOutlierDetectionEnabled") }
+    }
+
+    var dynamicStdDevThreshold: Double {
+        didSet { UserDefaults.standard.set(dynamicStdDevThreshold, forKey: "dynamicStdDevThreshold") }
+    }
+
+    var dynamicMinHistoryCount: Int {
+        didSet { UserDefaults.standard.set(dynamicMinHistoryCount, forKey: "dynamicMinHistoryCount") }
+    }
+
     // MARK: - Display Modes
 
     var cpuDisplayMode: MetricDisplayMode {
@@ -91,6 +103,9 @@ final class AppSettings {
         self.networkEnabled = defaults.object(forKey: "networkEnabled") as? Bool ?? true
         self.diskEnabled = defaults.object(forKey: "diskEnabled") as? Bool ?? true
         self.dynamicEnabled = defaults.object(forKey: "dynamicEnabled") as? Bool ?? true
+        self.dynamicOutlierDetectionEnabled = defaults.object(forKey: "dynamicOutlierDetectionEnabled") as? Bool ?? true
+        self.dynamicStdDevThreshold = defaults.object(forKey: "dynamicStdDevThreshold") as? Double ?? 4.0
+        self.dynamicMinHistoryCount = defaults.object(forKey: "dynamicMinHistoryCount") as? Int ?? 10
 
         self.cpuDisplayMode = MetricDisplayMode(rawValue: defaults.string(forKey: "cpuDisplayMode") ?? "") ?? .graph
         self.memoryDisplayMode = MetricDisplayMode(rawValue: defaults.string(forKey: "memoryDisplayMode") ?? "") ?? .graph
