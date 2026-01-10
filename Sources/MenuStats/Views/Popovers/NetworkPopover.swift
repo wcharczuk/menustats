@@ -18,6 +18,19 @@ struct NetworkPopover: View {
                 Spacer()
             }
 
+            // Link speed
+            HStack {
+                Text("Link Speed:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(metrics.linkSpeedBitsPerSecond > 0
+                    ? formatLinkSpeed(metrics.linkSpeedBitsPerSecond)
+                    : "Unknown")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             // Current rates
             HStack(spacing: 20) {
                 VStack(alignment: .leading) {
@@ -113,10 +126,23 @@ struct NetworkPopover: View {
             .font(.caption)
         }
         .padding()
-        .frame(width: 300)
+        .frame(width: 200)
     }
 
     private func openPreferences() {
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
+    private func formatLinkSpeed(_ bitsPerSecond: UInt64) -> String {
+        let bits = Double(bitsPerSecond)
+        if bits >= 1_000_000_000 {
+            return String(format: "%.0f Gbps", bits / 1_000_000_000)
+        } else if bits >= 1_000_000 {
+            return String(format: "%.0f Mbps", bits / 1_000_000)
+        } else if bits >= 1_000 {
+            return String(format: "%.0f Kbps", bits / 1_000)
+        } else {
+            return String(format: "%.0f bps", bits)
+        }
     }
 }

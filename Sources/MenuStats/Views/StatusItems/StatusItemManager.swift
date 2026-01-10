@@ -6,9 +6,6 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
     private let settings: AppSettings
     private let systemMonitor: SystemMonitor
 
-    // Consistent small font for all menu bar text
-    private let menuBarFont = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
-
     private var cpuStatusItem: NSStatusItem?
     private var memoryStatusItem: NSStatusItem?
     private var networkStatusItem: NSStatusItem?
@@ -162,11 +159,12 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
                 metrics: metrics,
                 threshold: settings.cpuThreshold
             ))
-            view.frame = NSRect(x: 0, y: 0, width: 38, height: 22)
+            let fittingWidth = max(view.fittingSize.width, 38)
+            view.frame = NSRect(x: 0, y: 0, width: fittingWidth, height: 22)
             statusItem.button?.subviews.forEach { $0.removeFromSuperview() }
             statusItem.button?.addSubview(view)
             statusItem.button?.title = ""
-            statusItem.length = 38
+            statusItem.length = fittingWidth
 
         case .graph:
             let view = NSHostingView(rootView: CPUStatusItemView(
@@ -195,11 +193,12 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
                 metrics: metrics,
                 threshold: settings.memoryThreshold
             ))
-            view.frame = NSRect(x: 0, y: 0, width: 38, height: 22)
+            let fittingWidth = max(view.fittingSize.width, 38)
+            view.frame = NSRect(x: 0, y: 0, width: fittingWidth, height: 22)
             statusItem.button?.subviews.forEach { $0.removeFromSuperview() }
             statusItem.button?.addSubview(view)
             statusItem.button?.title = ""
-            statusItem.length = 38
+            statusItem.length = fittingWidth
 
         case .graph:
             let view = NSHostingView(rootView: MemoryStatusItemView(
@@ -227,11 +226,12 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
             let view = NSHostingView(rootView: NetworkTextItemView(
                 metrics: metrics
             ))
-            view.frame = NSRect(x: 0, y: 0, width: 48, height: 22)
+            let fittingWidth = max(view.fittingSize.width, 38)
+            view.frame = NSRect(x: 0, y: 0, width: fittingWidth, height: 22)
             statusItem.button?.subviews.forEach { $0.removeFromSuperview() }
             statusItem.button?.addSubview(view)
             statusItem.button?.title = ""
-            statusItem.length = 48
+            statusItem.length = fittingWidth
 
         case .graph:
             let view = NSHostingView(rootView: NetworkStatusItemView(
@@ -260,11 +260,12 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
                 metrics: metrics,
                 threshold: settings.diskThreshold
             ))
-            view.frame = NSRect(x: 0, y: 0, width: 38, height: 22)
+            let fittingWidth = max(view.fittingSize.width, 38)
+            view.frame = NSRect(x: 0, y: 0, width: fittingWidth, height: 22)
             statusItem.button?.subviews.forEach { $0.removeFromSuperview() }
             statusItem.button?.addSubview(view)
             statusItem.button?.title = ""
-            statusItem.length = 38
+            statusItem.length = fittingWidth
 
         case .graph:
             let view = NSHostingView(rootView: DiskStatusItemView(
@@ -418,6 +419,20 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         headerItem.isEnabled = false
         menu.addItem(headerItem)
 
+        // Link speed
+        let linkSpeedText = metrics.linkSpeedBitsPerSecond > 0
+            ? formatLinkSpeed(metrics.linkSpeedBitsPerSecond)
+            : "Unknown"
+        let linkSpeedItem = NSMenuItem(
+            title: "Link Speed: \(linkSpeedText)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        linkSpeedItem.isEnabled = false
+        menu.addItem(linkSpeedItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         // Current rates
         let uploadItem = NSMenuItem(
             title: String(format: "↑ Upload: %@/s", ByteFormatter.format(metrics.bytesSentPerSecond)),
@@ -455,6 +470,19 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         menu.addItem(totalDownItem)
 
         addCommonMenuItems(to: menu)
+    }
+
+    private func formatLinkSpeed(_ bitsPerSecond: UInt64) -> String {
+        let bits = Double(bitsPerSecond)
+        if bits >= 1_000_000_000 {
+            return String(format: "%.0f Gbps", bits / 1_000_000_000)
+        } else if bits >= 1_000_000 {
+            return String(format: "%.0f Mbps", bits / 1_000_000)
+        } else if bits >= 1_000 {
+            return String(format: "%.0f Kbps", bits / 1_000)
+        } else {
+            return String(format: "%.0f bps", bits)
+        }
     }
 
     private func populateDiskMenu(_ menu: NSMenu) {
@@ -656,17 +684,5 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
 
     @objc private func quitApp() {
         NSApplication.shared.terminate(nil)
-    }
-
-    // MARK: - Helper Methods
-
-    private func makeAttributedString(_ text: String, color: NSColor) -> NSAttributedString {
-        NSAttributedString(
-            string: text,
-            attributes: [
-                .font: menuBarFont,
-                .foregroundColor: color
-            ]
-        )
     }
 }

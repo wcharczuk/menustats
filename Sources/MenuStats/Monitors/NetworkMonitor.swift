@@ -10,7 +10,7 @@ actor NetworkMonitor {
     private var previousTimestamp: Date?
 
     func getMetrics() -> NetworkMetrics {
-        let (totalSent, totalReceived) = getTotalNetworkBytes()
+        let (totalSent, totalReceived, linkSpeed) = getNetworkStats()
         let now = Date()
 
         var bytesSentPerSecond: UInt64 = 0
@@ -48,17 +48,19 @@ actor NetworkMonitor {
             totalBytesSent: totalSent,
             totalBytesReceived: totalReceived,
             sendHistory: sendHistory,
-            receiveHistory: receiveHistory
+            receiveHistory: receiveHistory,
+            linkSpeedBitsPerSecond: linkSpeed
         )
     }
 
-    private func getTotalNetworkBytes() -> (sent: UInt64, received: UInt64) {
+    private func getNetworkStats() -> (sent: UInt64, received: UInt64, linkSpeed: UInt64) {
         var totalSent: UInt64 = 0
         var totalReceived: UInt64 = 0
+        var maxLinkSpeed: UInt64 = 0
 
         var ifaddrsPtr: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&ifaddrsPtr) == 0, let firstAddr = ifaddrsPtr else {
-            return (0, 0)
+            return (0, 0, 0)
         }
         defer { freeifaddrs(ifaddrsPtr) }
 
@@ -75,6 +77,11 @@ actor NetworkMonitor {
                         let networkData = data.assumingMemoryBound(to: if_data.self).pointee
                         totalSent += UInt64(networkData.ifi_obytes)
                         totalReceived += UInt64(networkData.ifi_ibytes)
+                        // Track the highest link speed among active interfaces
+                        let speed = UInt64(networkData.ifi_baudrate)
+                        if speed > maxLinkSpeed {
+                            maxLinkSpeed = speed
+                        }
                     }
                 }
             }
@@ -82,7 +89,7 @@ actor NetworkMonitor {
             currentAddr = interface.ifa_next
         }
 
-        return (totalSent, totalReceived)
+        return (totalSent, totalReceived, maxLinkSpeed)
     }
 
     func getRollingMean() -> (send: Double, receive: Double) {

@@ -66,6 +66,47 @@ struct NetworkMetrics: Sendable {
     var totalBytesReceived: UInt64
     var sendHistory: [UInt64] // Recent bytes/sec for sparkline
     var receiveHistory: [UInt64]
+    var linkSpeedBitsPerSecond: UInt64 // Interface link speed in bits/sec
+
+    /// Link speed in bytes per second (divide bits by 8)
+    var linkSpeedBytesPerSecond: UInt64 {
+        linkSpeedBitsPerSecond / 8
+    }
+
+    /// Current send rate as percentage of link speed (0-100)
+    var sendPercentage: Double {
+        guard linkSpeedBytesPerSecond > 0 else { return 0 }
+        return min(Double(bytesSentPerSecond) / Double(linkSpeedBytesPerSecond) * 100, 100)
+    }
+
+    /// Current receive rate as percentage of link speed (0-100)
+    var receivePercentage: Double {
+        guard linkSpeedBytesPerSecond > 0 else { return 0 }
+        return min(Double(bytesReceivedPerSecond) / Double(linkSpeedBytesPerSecond) * 100, 100)
+    }
+
+    /// Combined send+receive as percentage of link speed (0-100)
+    var combinedPercentage: Double {
+        guard linkSpeedBytesPerSecond > 0 else { return 0 }
+        let combined = bytesSentPerSecond + bytesReceivedPerSecond
+        return min(Double(combined) / Double(linkSpeedBytesPerSecond) * 100, 100)
+    }
+
+    /// Convert send history to percentages of link speed
+    func sendHistoryPercentages() -> [Double] {
+        guard linkSpeedBytesPerSecond > 0 else {
+            return sendHistory.map { _ in 0.0 }
+        }
+        return sendHistory.map { min(Double($0) / Double(linkSpeedBytesPerSecond) * 100, 100) }
+    }
+
+    /// Convert receive history to percentages of link speed
+    func receiveHistoryPercentages() -> [Double] {
+        guard linkSpeedBytesPerSecond > 0 else {
+            return receiveHistory.map { _ in 0.0 }
+        }
+        return receiveHistory.map { min(Double($0) / Double(linkSpeedBytesPerSecond) * 100, 100) }
+    }
 
     static let empty = NetworkMetrics(
         bytesSentPerSecond: 0,
@@ -73,7 +114,8 @@ struct NetworkMetrics: Sendable {
         totalBytesSent: 0,
         totalBytesReceived: 0,
         sendHistory: [],
-        receiveHistory: []
+        receiveHistory: [],
+        linkSpeedBitsPerSecond: 0
     )
 }
 

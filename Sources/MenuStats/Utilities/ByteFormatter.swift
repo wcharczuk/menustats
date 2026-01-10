@@ -60,17 +60,34 @@ struct ByteFormatter {
         let value = Double(bytes)
 
         if value >= ByteUnit.gibibytes.divisor {
-            return String(format: "%.1fG", value / ByteUnit.gibibytes.divisor)
+            let gib = value / ByteUnit.gibibytes.divisor
+            if gib >= 100 {
+                return String(format: "%.0f GiB", gib)
+            } else if gib >= 10 {
+                return String(format: "%.1f GiB", gib)
+            } else {
+                return String(format: "%.2f GiB", gib)
+            }
         } else if value >= ByteUnit.mebibytes.divisor {
-            return String(format: "%.1fM", value / ByteUnit.mebibytes.divisor)
+            let mib = value / ByteUnit.mebibytes.divisor
+            if mib >= 100 {
+                return String(format: "%.0f MiB", mib)
+            } else if mib >= 10 {
+                return String(format: "%.1f MiB", mib)
+            } else {
+                return String(format: "%.2f MiB", mib)
+            }
         } else if value >= ByteUnit.kibibytes.divisor {
-            return String(format: "%.0fK", value / ByteUnit.kibibytes.divisor)
+            let kib = value / ByteUnit.kibibytes.divisor
+            if kib >= 100 {
+                return String(format: "%.0f KiB", kib)
+            } else if kib >= 10 {
+                return String(format: "%.1f KiB", kib)
+            } else {
+                return String(format: "%.2f KiB", kib)
+            }
         } else {
-            return String(format: "%.0fB", value)
+            return String(format: "%.0f B", value)
         }
-    }
-
-    static func formatRateCompact(_ bytesPerSecond: UInt64) -> String {
-        formatCompact(bytesPerSecond)
     }
 }

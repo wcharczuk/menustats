@@ -44,7 +44,7 @@ struct DynamicStatusItemView: View {
                 label: "CPU",
                 color: Self.outlierColor,
                 value: cpuMetrics.totalUsage,
-                isOutlier: true
+                isOutlier: true,
             ))
             addedLabels.insert("CPU")
         }

@@ -4,6 +4,8 @@ struct SparklineView: View {
     let values: [Double]
     let threshold: ThresholdConfig
     let maxValue: Double?
+    var overrideColor: Color?
+    var thresholdValue: Double? // Optional value to use for threshold color calculation (e.g., percentage)
 
     var body: some View {
         GeometryReader { geometry in
@@ -30,9 +32,15 @@ struct SparklineView: View {
                     }
                 }
 
-                // Determine color from latest value
-                let currentValue = values.last ?? 0
-                let color = ColorThresholds.graphColor(for: currentValue, threshold: threshold)
+                // Determine color from override or threshold
+                let color: Color
+                if let overrideColor = overrideColor {
+                    color = overrideColor
+                } else {
+                    // Use thresholdValue if provided, otherwise fall back to last value
+                    let colorValue = thresholdValue ?? values.last ?? 0
+                    color = ColorThresholds.graphColor(for: colorValue, threshold: threshold)
+                }
 
                 context.stroke(path, with: .color(color), lineWidth: 1.5)
 
