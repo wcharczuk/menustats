@@ -634,11 +634,14 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
                 .environment(systemMonitor)
 
             let hostingController = NSHostingController(rootView: preferencesView)
-            hostingController.sizingOptions = [.preferredContentSize]
+
+            // Calculate the natural size of the content
+            let fittingSize = hostingController.view.fittingSize
 
             let window = NSWindow(contentViewController: hostingController)
             window.title = "MenuStats Preferences"
             window.styleMask = [.titled, .closable]
+            window.setContentSize(fittingSize)
             window.center()
 
             preferencesWindow = window

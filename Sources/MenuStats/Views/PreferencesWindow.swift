@@ -21,8 +21,9 @@ struct PreferencesWindow: View {
                     Label("Thresholds", systemImage: "slider.horizontal.3")
                 }
         }
-        .scenePadding()
-        .frame(minWidth: 450, minHeight: 400)
+        .padding(.top, 15)
+        .frame(width: 450)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
