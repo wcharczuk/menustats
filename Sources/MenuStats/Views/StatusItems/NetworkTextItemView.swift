@@ -14,7 +14,7 @@ struct NetworkTextItemView: View {
                         .foregroundStyle(.primary)
                         .padding(.trailing, 2)
                     Text(ByteFormatter.formatCompact(metrics.bytesSentPerSecond))
-                        .font(.system(size: 7, weight: .light, design: .monospaced))
+                        .font(.system(size: 8, weight: .light, design: .monospaced))
                         .foregroundStyle(.primary)
                         .fixedSize()
                 }
@@ -25,7 +25,7 @@ struct NetworkTextItemView: View {
                         .foregroundStyle(.primary)
                         .padding(.trailing, 2)
                     Text(ByteFormatter.formatCompact(metrics.bytesReceivedPerSecond))
-                        .font(.system(size: 7, weight: .light, design: .monospaced))
+                        .font(.system(size: 8, weight: .light, design: .monospaced))
                         .foregroundStyle(.primary)
                         .fixedSize()
                 }

@@ -295,6 +295,10 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
             memoryThreshold: settings.memoryThreshold,
             networkThreshold: settings.networkThreshold,
             diskThreshold: settings.diskThreshold,
+            cpuDisplayMode: settings.cpuDisplayMode,
+            memoryDisplayMode: settings.memoryDisplayMode,
+            networkDisplayMode: settings.networkDisplayMode,
+            diskDisplayMode: settings.diskDisplayMode,
             outlierDetectionEnabled: settings.dynamicOutlierDetectionEnabled,
             stdDevThreshold: settings.dynamicStdDevThreshold,
             minHistoryCount: settings.dynamicMinHistoryCount
@@ -532,114 +536,184 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
     }
 
     private func populateDynamicMenu(_ menu: NSMenu) {
-        // Header
-        let headerItem = NSMenuItem(title: "System Status", action: nil, keyEquivalent: "")
-        headerItem.isEnabled = false
-        menu.addItem(headerItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        // Check each metric and add status
         let cpuMetrics = systemMonitor.cpuMetrics
         let memoryMetrics = systemMonitor.memoryMetrics
         let networkMetrics = systemMonitor.networkMetrics
         let diskMetrics = systemMonitor.diskMetrics
 
-        var hasIssues = false
+        // CPU Section
+        let cpuHeader = NSMenuItem(title: "CPU Usage", action: nil, keyEquivalent: "")
+        cpuHeader.isEnabled = false
+        menu.addItem(cpuHeader)
 
-        // CPU status
-        if settings.cpuThreshold.isCritical(cpuMetrics.totalUsage) {
-            let item = NSMenuItem(
-                title: String(format: "⚠ CPU Critical: %.1f%%", cpuMetrics.totalUsage),
+        let cpuValue = NSMenuItem(
+            title: String(format: "Total: %.1f%%", cpuMetrics.totalUsage),
+            action: nil,
+            keyEquivalent: ""
+        )
+        cpuValue.isEnabled = false
+        menu.addItem(cpuValue)
+
+        let pCores = cpuMetrics.coreUsages.filter { $0.coreType == .performance }
+        let eCores = cpuMetrics.coreUsages.filter { $0.coreType == .efficiency }
+
+        if !pCores.isEmpty {
+            let pAvg = pCores.map(\.usage).reduce(0, +) / Double(pCores.count)
+            let pItem = NSMenuItem(
+                title: String(format: "P-Cores (%d): %.1f%% avg", pCores.count, pAvg),
                 action: nil,
                 keyEquivalent: ""
             )
-            item.isEnabled = false
-            menu.addItem(item)
-            hasIssues = true
-        } else if settings.cpuThreshold.isWarning(cpuMetrics.totalUsage) {
-            let item = NSMenuItem(
-                title: String(format: "● CPU Warning: %.1f%%", cpuMetrics.totalUsage),
-                action: nil,
-                keyEquivalent: ""
-            )
-            item.isEnabled = false
-            menu.addItem(item)
-            hasIssues = true
+            pItem.isEnabled = false
+            menu.addItem(pItem)
         }
 
-        // Memory status
-        if settings.memoryThreshold.isCritical(memoryMetrics.usagePercentage) {
-            let item = NSMenuItem(
-                title: String(format: "⚠ Memory Critical: %.1f%%", memoryMetrics.usagePercentage),
+        if !eCores.isEmpty {
+            let eAvg = eCores.map(\.usage).reduce(0, +) / Double(eCores.count)
+            let eItem = NSMenuItem(
+                title: String(format: "E-Cores (%d): %.1f%% avg", eCores.count, eAvg),
                 action: nil,
                 keyEquivalent: ""
             )
-            item.isEnabled = false
-            menu.addItem(item)
-            hasIssues = true
-        } else if settings.memoryThreshold.isWarning(memoryMetrics.usagePercentage) {
-            let item = NSMenuItem(
-                title: String(format: "● Memory Warning: %.1f%%", memoryMetrics.usagePercentage),
-                action: nil,
-                keyEquivalent: ""
-            )
-            item.isEnabled = false
-            menu.addItem(item)
-            hasIssues = true
+            eItem.isEnabled = false
+            menu.addItem(eItem)
         }
 
-        // Network status (same logic as in DynamicStatusItemView)
-        let maxNetworkMBps = max(
-            Double(networkMetrics.bytesSentPerSecond),
-            Double(networkMetrics.bytesReceivedPerSecond)
-        ) / (1024 * 1024)
-        if settings.networkThreshold.isCritical(maxNetworkMBps) {
-            let item = NSMenuItem(
-                title: String(format: "⚠ Network Critical: %.1f MB/s", maxNetworkMBps),
-                action: nil,
-                keyEquivalent: ""
-            )
-            item.isEnabled = false
-            menu.addItem(item)
-            hasIssues = true
-        } else if settings.networkThreshold.isWarning(maxNetworkMBps) {
-            let item = NSMenuItem(
-                title: String(format: "● Network Warning: %.1f MB/s", maxNetworkMBps),
-                action: nil,
-                keyEquivalent: ""
-            )
-            item.isEnabled = false
-            menu.addItem(item)
-            hasIssues = true
-        }
+        menu.addItem(NSMenuItem.separator())
 
-        // Disk status
-        if settings.diskThreshold.isCritical(diskMetrics.usagePercentage) {
-            let item = NSMenuItem(
-                title: String(format: "⚠ Disk Critical: %.1f%%", diskMetrics.usagePercentage),
-                action: nil,
-                keyEquivalent: ""
-            )
-            item.isEnabled = false
-            menu.addItem(item)
-            hasIssues = true
-        } else if settings.diskThreshold.isWarning(diskMetrics.usagePercentage) {
-            let item = NSMenuItem(
-                title: String(format: "● Disk Warning: %.1f%%", diskMetrics.usagePercentage),
-                action: nil,
-                keyEquivalent: ""
-            )
-            item.isEnabled = false
-            menu.addItem(item)
-            hasIssues = true
-        }
+        // Memory Section
+        let memHeader = NSMenuItem(title: "Memory Usage", action: nil, keyEquivalent: "")
+        memHeader.isEnabled = false
+        menu.addItem(memHeader)
 
-        if !hasIssues {
-            let item = NSMenuItem(title: "✓ All systems normal", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-        }
+        let memPercent = NSMenuItem(
+            title: String(format: "Used: %.1f%%", memoryMetrics.usagePercentage),
+            action: nil,
+            keyEquivalent: ""
+        )
+        memPercent.isEnabled = false
+        menu.addItem(memPercent)
+
+        let memAbs = NSMenuItem(
+            title: String(format: "%.2f / %.2f GiB", memoryMetrics.usedGiB, memoryMetrics.totalGiB),
+            action: nil,
+            keyEquivalent: ""
+        )
+        memAbs.isEnabled = false
+        menu.addItem(memAbs)
+
+        let activeItem = NSMenuItem(
+            title: String(format: "Active: %@", ByteFormatter.format(memoryMetrics.activeBytes)),
+            action: nil,
+            keyEquivalent: ""
+        )
+        activeItem.isEnabled = false
+        menu.addItem(activeItem)
+
+        let wiredItem = NSMenuItem(
+            title: String(format: "Wired: %@", ByteFormatter.format(memoryMetrics.wiredBytes)),
+            action: nil,
+            keyEquivalent: ""
+        )
+        wiredItem.isEnabled = false
+        menu.addItem(wiredItem)
+
+        let compressedItem = NSMenuItem(
+            title: String(format: "Compressed: %@", ByteFormatter.format(memoryMetrics.compressedBytes)),
+            action: nil,
+            keyEquivalent: ""
+        )
+        compressedItem.isEnabled = false
+        menu.addItem(compressedItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Network Section
+        let netHeader = NSMenuItem(title: "Network Activity", action: nil, keyEquivalent: "")
+        netHeader.isEnabled = false
+        menu.addItem(netHeader)
+
+        let linkSpeedText = networkMetrics.linkSpeedBitsPerSecond > 0
+            ? formatLinkSpeed(networkMetrics.linkSpeedBitsPerSecond)
+            : "Unknown"
+        let linkSpeedItem = NSMenuItem(
+            title: "Link Speed: \(linkSpeedText)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        linkSpeedItem.isEnabled = false
+        menu.addItem(linkSpeedItem)
+
+        let uploadItem = NSMenuItem(
+            title: String(format: "↑ Upload: %@/s", ByteFormatter.format(networkMetrics.bytesSentPerSecond)),
+            action: nil,
+            keyEquivalent: ""
+        )
+        uploadItem.isEnabled = false
+        menu.addItem(uploadItem)
+
+        let downloadItem = NSMenuItem(
+            title: String(format: "↓ Download: %@/s", ByteFormatter.format(networkMetrics.bytesReceivedPerSecond)),
+            action: nil,
+            keyEquivalent: ""
+        )
+        downloadItem.isEnabled = false
+        menu.addItem(downloadItem)
+
+        let totalUpItem = NSMenuItem(
+            title: String(format: "Total Sent: %@", ByteFormatter.format(networkMetrics.totalBytesSent)),
+            action: nil,
+            keyEquivalent: ""
+        )
+        totalUpItem.isEnabled = false
+        menu.addItem(totalUpItem)
+
+        let totalDownItem = NSMenuItem(
+            title: String(format: "Total Received: %@", ByteFormatter.format(networkMetrics.totalBytesReceived)),
+            action: nil,
+            keyEquivalent: ""
+        )
+        totalDownItem.isEnabled = false
+        menu.addItem(totalDownItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Disk Section
+        let diskHeader = NSMenuItem(title: "Disk Usage", action: nil, keyEquivalent: "")
+        diskHeader.isEnabled = false
+        menu.addItem(diskHeader)
+
+        let diskPercent = NSMenuItem(
+            title: String(format: "Used: %.1f%%", diskMetrics.usagePercentage),
+            action: nil,
+            keyEquivalent: ""
+        )
+        diskPercent.isEnabled = false
+        menu.addItem(diskPercent)
+
+        let usedItem = NSMenuItem(
+            title: String(format: "Used: %.2f GiB", diskMetrics.usedGiB),
+            action: nil,
+            keyEquivalent: ""
+        )
+        usedItem.isEnabled = false
+        menu.addItem(usedItem)
+
+        let freeItem = NSMenuItem(
+            title: String(format: "Free: %.2f GiB", diskMetrics.freeGiB),
+            action: nil,
+            keyEquivalent: ""
+        )
+        freeItem.isEnabled = false
+        menu.addItem(freeItem)
+
+        let totalItem = NSMenuItem(
+            title: String(format: "Total: %.2f GiB", diskMetrics.totalGiB),
+            action: nil,
+            keyEquivalent: ""
+        )
+        totalItem.isEnabled = false
+        menu.addItem(totalItem)
 
         addCommonMenuItems(to: menu)
     }
