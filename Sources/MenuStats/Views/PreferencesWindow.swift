@@ -18,7 +18,7 @@ struct PreferencesWindow: View {
 
             DynamicSettingsView()
                 .tabItem {
-                    Label("Dynamic", systemImage: "waveform.path.ecg")
+                    Label("Dynamic Status Item", systemImage: "waveform.path.ecg")
                 }
 
             ThresholdsSettingsView()
@@ -151,12 +151,12 @@ struct DynamicSettingsView: View {
 
         Form {
             Section {
-                Toggle("Enable Dynamic Indicator", isOn: $settings.dynamicEnabled)
+                Toggle("Enable Dynamic Status Indicator", isOn: $settings.dynamicEnabled)
                 Text("Shows which metrics need attention based on the selected detection method")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                Text("Dynamic Indicator")
+                Text("Dynamic Status Indicator")
             }
 
             if settings.dynamicEnabled {
