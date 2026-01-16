@@ -123,6 +123,21 @@ struct MetricsSettingsView: View {
             } header: {
                 Text("Disk")
             }
+
+            Section {
+                Toggle("Enable Latency Monitoring", isOn: $settings.latencyEnabled)
+                if settings.latencyEnabled {
+                    Picker("Display Mode", selection: $settings.latencyDisplayMode) {
+                        Text("Text").tag(MetricDisplayMode.text)
+                        Text("Graph").tag(MetricDisplayMode.graph)
+                    }
+                }
+                Text("Measures round-trip time to google.com")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Latency")
+            }
         }
         .formStyle(.grouped)
     }
@@ -137,7 +152,7 @@ struct DynamicSettingsView: View {
         Form {
             Section {
                 Toggle("Enable Dynamic Indicator", isOn: $settings.dynamicEnabled)
-                Text("Shows which metrics are approaching or exceeding thresholds")
+                Text("Shows which metrics need attention based on the selected detection method")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
@@ -146,15 +161,22 @@ struct DynamicSettingsView: View {
 
             if settings.dynamicEnabled {
                 Section {
-                    Toggle("Enable Outlier Detection", isOn: $settings.dynamicOutlierDetectionEnabled)
-                    Text("Highlight metrics with unusual activity based on recent history")
+                    Picker("Detection Method", selection: $settings.dynamicDetectionMethod) {
+                        ForEach(DynamicDetectionMethod.allCases, id: \.self) { method in
+                            Text(method.displayName).tag(method)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+
+                    Text(settings.dynamicDetectionMethod.description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                } header: {
+                    Text("Detection Method")
+                }
 
-                    if settings.dynamicOutlierDetectionEnabled {
-                        Divider()
-                            .padding(.vertical, 4)
-
+                if settings.dynamicDetectionMethod == .outliers || settings.dynamicDetectionMethod == .both {
+                    Section {
                         HStack {
                             Text("Sensitivity")
                             Spacer()
@@ -198,9 +220,9 @@ struct DynamicSettingsView: View {
                         Text("Number of samples required before outlier detection activates")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    } header: {
+                        Text("Outlier Detection Settings")
                     }
-                } header: {
-                    Text("Outlier Detection")
                 }
             }
         }
@@ -248,8 +270,145 @@ struct ThresholdsSettingsView: View {
                 threshold: $settings.diskThreshold,
                 unit: "%"
             )
+
+            LatencyThresholdSection(
+                title: "Latency",
+                threshold: $settings.latencyThreshold
+            )
         }
         .formStyle(.grouped)
+    }
+}
+
+struct LatencyThresholdSection: View {
+    let title: String
+    @Binding var threshold: ThresholdConfig
+
+    var body: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                // Current values display
+                HStack {
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.primary.opacity(0.5)).frame(width: 8, height: 8)
+                        Text("Normal: <\(Int(threshold.greenMax))ms")
+                            .font(.caption)
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.blue).frame(width: 8, height: 8)
+                        Text("Warning: \(Int(threshold.greenMax))-\(Int(threshold.yellowMax))ms")
+                            .font(.caption)
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.purple).frame(width: 8, height: 8)
+                        Text("Critical: >\(Int(threshold.yellowMax))ms")
+                            .font(.caption)
+                    }
+                }
+
+                // Dual thumb slider for latency (0-500ms range)
+                LatencyDualThumbSlider(
+                    warningValue: $threshold.greenMax,
+                    criticalValue: $threshold.yellowMax,
+                    range: 0...500
+                )
+                .frame(height: 44)
+            }
+        } header: {
+            Text(title)
+        }
+    }
+}
+
+struct LatencyDualThumbSlider: View {
+    @Binding var warningValue: Double
+    @Binding var criticalValue: Double
+    let range: ClosedRange<Double>
+
+    private let trackHeight: CGFloat = 6
+    private let thumbSize: CGFloat = 18
+
+    var body: some View {
+        GeometryReader { geometry in
+            let trackWidth = geometry.size.width - thumbSize
+            let warningPosition = thumbSize / 2 + (warningValue - range.lowerBound) / (range.upperBound - range.lowerBound) * trackWidth
+            let criticalPosition = thumbSize / 2 + (criticalValue - range.lowerBound) / (range.upperBound - range.lowerBound) * trackWidth
+
+            VStack(spacing: 4) {
+                ZStack(alignment: .leading) {
+                    // Track background segments
+                    HStack(spacing: 0) {
+                        // Normal segment (0 to warning)
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.3))
+                            .frame(width: max(0, warningPosition - thumbSize / 2))
+
+                        // Warning segment (warning to critical)
+                        Rectangle()
+                            .fill(Color.blue)
+                            .frame(width: max(0, criticalPosition - warningPosition))
+
+                        // Critical segment (critical to max)
+                        Rectangle()
+                            .fill(Color.purple)
+                    }
+                    .frame(height: trackHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: trackHeight / 2))
+                    .padding(.horizontal, thumbSize / 2)
+
+                    // Warning thumb
+                    Circle()
+                        .fill(Color.white)
+                        .overlay(Circle().stroke(Color.blue, lineWidth: 2))
+                        .frame(width: thumbSize, height: thumbSize)
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                        .position(x: warningPosition, y: geometry.size.height / 2 - 10)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    let newValue = valueFromPosition(value.location.x, trackWidth: trackWidth)
+                                    warningValue = min(newValue, criticalValue - 10)
+                                }
+                        )
+
+                    // Critical thumb
+                    Circle()
+                        .fill(Color.white)
+                        .overlay(Circle().stroke(Color.purple, lineWidth: 2))
+                        .frame(width: thumbSize, height: thumbSize)
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                        .position(x: criticalPosition, y: geometry.size.height / 2 - 10)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    let newValue = valueFromPosition(value.location.x, trackWidth: trackWidth)
+                                    criticalValue = max(newValue, warningValue + 10)
+                                }
+                        )
+                }
+                .frame(height: thumbSize + 4)
+
+                // Min/max labels
+                HStack {
+                    Text("0ms")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("500ms")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func valueFromPosition(_ x: CGFloat, trackWidth: CGFloat) -> Double {
+        let clampedX = max(thumbSize / 2, min(x, trackWidth + thumbSize / 2))
+        let percentage = (clampedX - thumbSize / 2) / trackWidth
+        let value = range.lowerBound + percentage * (range.upperBound - range.lowerBound)
+        return (value / 10).rounded() * 10 // Snap to 10ms increments
     }
 }
 

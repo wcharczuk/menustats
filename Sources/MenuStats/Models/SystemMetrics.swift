@@ -145,3 +145,30 @@ struct DiskMetrics: Sendable {
 
     static let empty = DiskMetrics(usedBytes: 0, totalBytes: 0, freeBytes: 0)
 }
+
+// MARK: - Latency Metrics
+
+struct LatencyMetrics: Sendable {
+    var latencyMs: Double? // nil if ping failed
+    var history: [Double] // Recent latency values in ms for sparkline
+
+    /// Returns the current latency as a formatted string
+    var formattedLatency: String {
+        if let latency = latencyMs {
+            if latency < 1 {
+                return String(format: "%.1fms", latency)
+            } else {
+                return String(format: "%.0fms", latency)
+            }
+        }
+        return "—"
+    }
+
+    /// Returns the max value for the sparkline (minimum 10ms, but scales up based on history)
+    var sparklineMaxValue: Double {
+        let historyMax = history.max() ?? 0
+        return max(10.0, historyMax)
+    }
+
+    static let empty = LatencyMetrics(latencyMs: nil, history: [])
+}

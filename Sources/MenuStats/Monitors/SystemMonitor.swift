@@ -7,11 +7,13 @@ final class SystemMonitor {
     private(set) var memoryMetrics = MemoryMetrics.empty
     private(set) var networkMetrics = NetworkMetrics.empty
     private(set) var diskMetrics = DiskMetrics.empty
+    private(set) var latencyMetrics = LatencyMetrics.empty
 
     private let cpuMonitor = CPUMonitor()
     private let memoryMonitor = MemoryMonitor()
     private let networkMonitor = NetworkMonitor()
     private let diskMonitor = DiskMonitor()
+    private let latencyMonitor = LatencyMonitor()
 
     private var monitoringTask: Task<Void, Never>?
     private var updateInterval: TimeInterval = 2.0
@@ -41,13 +43,15 @@ final class SystemMonitor {
         async let memory = memoryMonitor.getMetrics()
         async let network = networkMonitor.getMetrics()
         async let disk = diskMonitor.getMetrics()
+        async let latency = latencyMonitor.getMetrics()
 
-        let (cpuResult, memoryResult, networkResult, diskResult) = await (cpu, memory, network, disk)
+        let (cpuResult, memoryResult, networkResult, diskResult, latencyResult) = await (cpu, memory, network, disk, latency)
 
         cpuMetrics = cpuResult
         memoryMetrics = memoryResult
         networkMetrics = networkResult
         diskMetrics = diskResult
+        latencyMetrics = latencyResult
     }
 
     func isNetworkActive() async -> Bool {

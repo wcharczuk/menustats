@@ -10,13 +10,14 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
     private var memoryStatusItem: NSStatusItem?
     private var networkStatusItem: NSStatusItem?
     private var diskStatusItem: NSStatusItem?
+    private var latencyStatusItem: NSStatusItem?
     private var dynamicStatusItem: NSStatusItem?
 
     private var observationTask: Task<Void, Never>?
     private var preferencesWindow: NSWindow?
 
     private enum MenuType {
-        case cpu, memory, network, disk, dynamic
+        case cpu, memory, network, disk, latency, dynamic
     }
     private var menuTypeMap: [NSMenu: MenuType] = [:]
 
@@ -102,6 +103,20 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
             }
         }
 
+        // Latency
+        if settings.latencyEnabled && settings.latencyDisplayMode != .hidden {
+            if latencyStatusItem == nil {
+                latencyStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                setupStatusItemMenu(latencyStatusItem, type: .latency)
+            }
+        } else {
+            if let item = latencyStatusItem {
+                if let menu = item.menu { menuTypeMap.removeValue(forKey: menu) }
+                NSStatusBar.system.removeStatusItem(item)
+                latencyStatusItem = nil
+            }
+        }
+
         // Dynamic (leftmost)
         if settings.dynamicEnabled {
             if dynamicStatusItem == nil {
@@ -136,6 +151,7 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         case .memory: populateMemoryMenu(menu)
         case .network: populateNetworkMenu(menu)
         case .disk: populateDiskMenu(menu)
+        case .latency: populateLatencyMenu(menu)
         case .dynamic: populateDynamicMenu(menu)
         }
     }
@@ -145,6 +161,7 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         updateMemoryStatusItem()
         updateNetworkStatusItem()
         updateDiskStatusItem()
+        updateLatencyStatusItem()
         updateDynamicStatusItem()
     }
 
@@ -283,6 +300,40 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         }
     }
 
+    private func updateLatencyStatusItem() {
+        guard let statusItem = latencyStatusItem else { return }
+
+        let metrics = systemMonitor.latencyMetrics
+
+        switch settings.latencyDisplayMode {
+        case .text:
+            let view = NSHostingView(rootView: LatencyTextItemView(
+                metrics: metrics,
+                threshold: settings.latencyThreshold
+            ))
+            let fittingWidth = max(view.fittingSize.width, 38)
+            view.frame = NSRect(x: 0, y: 0, width: fittingWidth, height: 22)
+            statusItem.button?.subviews.forEach { $0.removeFromSuperview() }
+            statusItem.button?.addSubview(view)
+            statusItem.button?.title = ""
+            statusItem.length = fittingWidth
+
+        case .graph:
+            let view = NSHostingView(rootView: LatencyStatusItemView(
+                metrics: metrics,
+                threshold: settings.latencyThreshold
+            ))
+            view.frame = NSRect(x: 0, y: 0, width: 36, height: 22)
+            statusItem.button?.subviews.forEach { $0.removeFromSuperview() }
+            statusItem.button?.addSubview(view)
+            statusItem.button?.title = ""
+            statusItem.length = 36
+
+        case .hidden:
+            break
+        }
+    }
+
     private func updateDynamicStatusItem() {
         guard let statusItem = dynamicStatusItem else { return }
 
@@ -291,15 +342,18 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
             memoryMetrics: systemMonitor.memoryMetrics,
             networkMetrics: systemMonitor.networkMetrics,
             diskMetrics: systemMonitor.diskMetrics,
+            latencyMetrics: systemMonitor.latencyMetrics,
             cpuThreshold: settings.cpuThreshold,
             memoryThreshold: settings.memoryThreshold,
             networkThreshold: settings.networkThreshold,
             diskThreshold: settings.diskThreshold,
+            latencyThreshold: settings.latencyThreshold,
             cpuDisplayMode: settings.cpuDisplayMode,
             memoryDisplayMode: settings.memoryDisplayMode,
             networkDisplayMode: settings.networkDisplayMode,
             diskDisplayMode: settings.diskDisplayMode,
-            outlierDetectionEnabled: settings.dynamicOutlierDetectionEnabled,
+            latencyDisplayMode: settings.latencyDisplayMode,
+            detectionMethod: settings.dynamicDetectionMethod,
             stdDevThreshold: settings.dynamicStdDevThreshold,
             minHistoryCount: settings.dynamicMinHistoryCount
         )
@@ -535,11 +589,74 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         addCommonMenuItems(to: menu)
     }
 
+    private func populateLatencyMenu(_ menu: NSMenu) {
+        let metrics = systemMonitor.latencyMetrics
+
+        // Header
+        let headerItem = NSMenuItem(title: "Network Latency", action: nil, keyEquivalent: "")
+        headerItem.isEnabled = false
+        menu.addItem(headerItem)
+
+        // Current value
+        let valueItem = NSMenuItem(
+            title: "Ping: \(metrics.formattedLatency)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        valueItem.isEnabled = false
+        menu.addItem(valueItem)
+
+        // Host
+        let hostItem = NSMenuItem(
+            title: "Host: google.com",
+            action: nil,
+            keyEquivalent: ""
+        )
+        hostItem.isEnabled = false
+        menu.addItem(hostItem)
+
+        // Stats from history
+        if !metrics.history.isEmpty {
+            menu.addItem(NSMenuItem.separator())
+
+            let minLatency = metrics.history.min() ?? 0
+            let maxLatency = metrics.history.max() ?? 0
+            let avgLatency = metrics.history.reduce(0, +) / Double(metrics.history.count)
+
+            let minItem = NSMenuItem(
+                title: String(format: "Min: %.1fms", minLatency),
+                action: nil,
+                keyEquivalent: ""
+            )
+            minItem.isEnabled = false
+            menu.addItem(minItem)
+
+            let maxItem = NSMenuItem(
+                title: String(format: "Max: %.1fms", maxLatency),
+                action: nil,
+                keyEquivalent: ""
+            )
+            maxItem.isEnabled = false
+            menu.addItem(maxItem)
+
+            let avgItem = NSMenuItem(
+                title: String(format: "Avg: %.1fms", avgLatency),
+                action: nil,
+                keyEquivalent: ""
+            )
+            avgItem.isEnabled = false
+            menu.addItem(avgItem)
+        }
+
+        addCommonMenuItems(to: menu)
+    }
+
     private func populateDynamicMenu(_ menu: NSMenu) {
         let cpuMetrics = systemMonitor.cpuMetrics
         let memoryMetrics = systemMonitor.memoryMetrics
         let networkMetrics = systemMonitor.networkMetrics
         let diskMetrics = systemMonitor.diskMetrics
+        let latencyMetrics = systemMonitor.latencyMetrics
 
         // CPU Section
         let cpuHeader = NSMenuItem(title: "CPU Usage", action: nil, keyEquivalent: "")
@@ -714,6 +831,35 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         )
         totalItem.isEnabled = false
         menu.addItem(totalItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Latency Section
+        let latencyHeader = NSMenuItem(title: "Network Latency", action: nil, keyEquivalent: "")
+        latencyHeader.isEnabled = false
+        menu.addItem(latencyHeader)
+
+        let latencyValue = NSMenuItem(
+            title: "Ping: \(latencyMetrics.formattedLatency)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        latencyValue.isEnabled = false
+        menu.addItem(latencyValue)
+
+        if !latencyMetrics.history.isEmpty {
+            let minLatency = latencyMetrics.history.min() ?? 0
+            let maxLatency = latencyMetrics.history.max() ?? 0
+            let avgLatency = latencyMetrics.history.reduce(0, +) / Double(latencyMetrics.history.count)
+
+            let latencyStats = NSMenuItem(
+                title: String(format: "Min/Avg/Max: %.0f/%.0f/%.0fms", minLatency, avgLatency, maxLatency),
+                action: nil,
+                keyEquivalent: ""
+            )
+            latencyStats.isEnabled = false
+            menu.addItem(latencyStats)
+        }
 
         addCommonMenuItems(to: menu)
     }

@@ -7,6 +7,28 @@ enum MetricDisplayMode: String, CaseIterable, Codable {
     case hidden
 }
 
+enum DynamicDetectionMethod: String, CaseIterable, Codable {
+    case thresholds
+    case outliers
+    case both
+
+    var displayName: String {
+        switch self {
+        case .thresholds: return "Thresholds Only"
+        case .outliers: return "Outlier Detection Only"
+        case .both: return "Both Methods"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .thresholds: return "Show alerts when metrics exceed warning or critical thresholds"
+        case .outliers: return "Show alerts when metrics deviate significantly from recent history"
+        case .both: return "Show alerts when either thresholds are exceeded or outliers are detected"
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class AppSettings {
@@ -38,12 +60,16 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(diskEnabled, forKey: "diskEnabled") }
     }
 
+    var latencyEnabled: Bool {
+        didSet { UserDefaults.standard.set(latencyEnabled, forKey: "latencyEnabled") }
+    }
+
     var dynamicEnabled: Bool {
         didSet { UserDefaults.standard.set(dynamicEnabled, forKey: "dynamicEnabled") }
     }
 
-    var dynamicOutlierDetectionEnabled: Bool {
-        didSet { UserDefaults.standard.set(dynamicOutlierDetectionEnabled, forKey: "dynamicOutlierDetectionEnabled") }
+    var dynamicDetectionMethod: DynamicDetectionMethod {
+        didSet { UserDefaults.standard.set(dynamicDetectionMethod.rawValue, forKey: "dynamicDetectionMethod") }
     }
 
     var dynamicStdDevThreshold: Double {
@@ -72,6 +98,10 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(diskDisplayMode.rawValue, forKey: "diskDisplayMode") }
     }
 
+    var latencyDisplayMode: MetricDisplayMode {
+        didSet { UserDefaults.standard.set(latencyDisplayMode.rawValue, forKey: "latencyDisplayMode") }
+    }
+
     // MARK: - Thresholds
 
     var cpuThreshold: ThresholdConfig {
@@ -90,6 +120,10 @@ final class AppSettings {
         didSet { saveThreshold(diskThreshold, key: "diskThreshold") }
     }
 
+    var latencyThreshold: ThresholdConfig {
+        didSet { saveThreshold(latencyThreshold, key: "latencyThreshold") }
+    }
+
     // MARK: - Initialization
 
     init() {
@@ -102,8 +136,9 @@ final class AppSettings {
         self.memoryEnabled = defaults.object(forKey: "memoryEnabled") as? Bool ?? true
         self.networkEnabled = defaults.object(forKey: "networkEnabled") as? Bool ?? true
         self.diskEnabled = defaults.object(forKey: "diskEnabled") as? Bool ?? true
+        self.latencyEnabled = defaults.object(forKey: "latencyEnabled") as? Bool ?? true
         self.dynamicEnabled = defaults.object(forKey: "dynamicEnabled") as? Bool ?? true
-        self.dynamicOutlierDetectionEnabled = defaults.object(forKey: "dynamicOutlierDetectionEnabled") as? Bool ?? true
+        self.dynamicDetectionMethod = DynamicDetectionMethod(rawValue: defaults.string(forKey: "dynamicDetectionMethod") ?? "") ?? .both
         self.dynamicStdDevThreshold = defaults.object(forKey: "dynamicStdDevThreshold") as? Double ?? 4.0
         self.dynamicMinHistoryCount = defaults.object(forKey: "dynamicMinHistoryCount") as? Int ?? 10
 
@@ -111,11 +146,14 @@ final class AppSettings {
         self.memoryDisplayMode = MetricDisplayMode(rawValue: defaults.string(forKey: "memoryDisplayMode") ?? "") ?? .graph
         self.networkDisplayMode = MetricDisplayMode(rawValue: defaults.string(forKey: "networkDisplayMode") ?? "") ?? .graph
         self.diskDisplayMode = MetricDisplayMode(rawValue: defaults.string(forKey: "diskDisplayMode") ?? "") ?? .text
+        self.latencyDisplayMode = MetricDisplayMode(rawValue: defaults.string(forKey: "latencyDisplayMode") ?? "") ?? .graph
 
         self.cpuThreshold = Self.loadThreshold(key: "cpuThreshold") ?? ThresholdConfig(greenMax: 50, yellowMax: 80)
         self.memoryThreshold = Self.loadThreshold(key: "memoryThreshold") ?? ThresholdConfig(greenMax: 60, yellowMax: 85)
         self.networkThreshold = Self.loadThreshold(key: "networkThreshold") ?? ThresholdConfig(greenMax: 50, yellowMax: 80)
         self.diskThreshold = Self.loadThreshold(key: "diskThreshold") ?? ThresholdConfig(greenMax: 70, yellowMax: 90)
+        // Latency thresholds in ms: normal < 50ms, warning 50-100ms, critical > 100ms
+        self.latencyThreshold = Self.loadThreshold(key: "latencyThreshold") ?? ThresholdConfig(greenMax: 50, yellowMax: 100)
     }
 
     // MARK: - Private Helpers

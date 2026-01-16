@@ -5,6 +5,7 @@ enum DynamicAlertType: Identifiable, CaseIterable {
     case memory
     case network
     case disk
+    case latency
 
     var id: Self { self }
 }
@@ -14,63 +15,93 @@ struct DynamicStatusItemView: View {
     let memoryMetrics: MemoryMetrics
     let networkMetrics: NetworkMetrics
     let diskMetrics: DiskMetrics
+    let latencyMetrics: LatencyMetrics
     let cpuThreshold: ThresholdConfig
     let memoryThreshold: ThresholdConfig
     let networkThreshold: ThresholdConfig
     let diskThreshold: ThresholdConfig
+    let latencyThreshold: ThresholdConfig
     let cpuDisplayMode: MetricDisplayMode
     let memoryDisplayMode: MetricDisplayMode
     let networkDisplayMode: MetricDisplayMode
     let diskDisplayMode: MetricDisplayMode
-    let outlierDetectionEnabled: Bool
+    let latencyDisplayMode: MetricDisplayMode
+    let detectionMethod: DynamicDetectionMethod
     let stdDevThreshold: Double
     let minHistoryCount: Int
+
+    private var useThresholds: Bool {
+        detectionMethod == .thresholds || detectionMethod == .both
+    }
+
+    private var useOutliers: Bool {
+        detectionMethod == .outliers || detectionMethod == .both
+    }
 
     private var activeAlerts: [DynamicAlertType] {
         var result: [DynamicAlertType] = []
 
-        // Check CPU threshold or outlier
-        if cpuThreshold.isCritical(cpuMetrics.totalUsage) ||
-           cpuThreshold.isWarning(cpuMetrics.totalUsage) ||
-           isOutlier(value: cpuMetrics.totalUsage, history: cpuMetrics.history) {
+        // Check CPU
+        let cpuThresholdTriggered = useThresholds && (
+            cpuThreshold.isCritical(cpuMetrics.totalUsage) ||
+            cpuThreshold.isWarning(cpuMetrics.totalUsage)
+        )
+        let cpuOutlierTriggered = useOutliers && isOutlier(value: cpuMetrics.totalUsage, history: cpuMetrics.history)
+        if cpuThresholdTriggered || cpuOutlierTriggered {
             result.append(.cpu)
         }
 
-        // Check Memory threshold or outlier
-        if memoryThreshold.isCritical(memoryMetrics.usagePercentage) ||
-           memoryThreshold.isWarning(memoryMetrics.usagePercentage) ||
-           isOutlier(value: memoryMetrics.usagePercentage, history: memoryMetrics.history) {
+        // Check Memory
+        let memoryThresholdTriggered = useThresholds && (
+            memoryThreshold.isCritical(memoryMetrics.usagePercentage) ||
+            memoryThreshold.isWarning(memoryMetrics.usagePercentage)
+        )
+        let memoryOutlierTriggered = useOutliers && isOutlier(value: memoryMetrics.usagePercentage, history: memoryMetrics.history)
+        if memoryThresholdTriggered || memoryOutlierTriggered {
             result.append(.memory)
         }
 
-        // Check Network threshold or outlier
+        // Check Network
         let maxNetworkMBps = max(
             Double(networkMetrics.bytesSentPerSecond),
             Double(networkMetrics.bytesReceivedPerSecond)
         ) / (1024 * 1024)
-
-        if networkThreshold.isCritical(maxNetworkMBps) ||
-           networkThreshold.isWarning(maxNetworkMBps) {
+        let networkThresholdTriggered = useThresholds && (
+            networkThreshold.isCritical(maxNetworkMBps) ||
+            networkThreshold.isWarning(maxNetworkMBps)
+        )
+        let combinedHistory = zip(networkMetrics.sendHistory, networkMetrics.receiveHistory)
+            .map { Double(max($0, $1)) / (1024 * 1024) }
+        let networkOutlierTriggered = useOutliers && isOutlier(value: maxNetworkMBps, history: combinedHistory)
+        if networkThresholdTriggered || networkOutlierTriggered {
             result.append(.network)
-        } else {
-            let combinedHistory = zip(networkMetrics.sendHistory, networkMetrics.receiveHistory)
-                .map { Double(max($0, $1)) / (1024 * 1024) }
-            if isOutlier(value: maxNetworkMBps, history: combinedHistory) {
-                result.append(.network)
-            }
         }
 
-        // Check Disk threshold (disk doesn't have history, so no outlier check)
-        if diskThreshold.isCritical(diskMetrics.usagePercentage) ||
-           diskThreshold.isWarning(diskMetrics.usagePercentage) {
+        // Check Disk (disk doesn't have history, so only threshold check)
+        let diskThresholdTriggered = useThresholds && (
+            diskThreshold.isCritical(diskMetrics.usagePercentage) ||
+            diskThreshold.isWarning(diskMetrics.usagePercentage)
+        )
+        if diskThresholdTriggered {
             result.append(.disk)
+        }
+
+        // Check Latency
+        if let latencyMs = latencyMetrics.latencyMs {
+            let latencyThresholdTriggered = useThresholds && (
+                latencyThreshold.isCritical(latencyMs) ||
+                latencyThreshold.isWarning(latencyMs)
+            )
+            let latencyOutlierTriggered = useOutliers && isOutlier(value: latencyMs, history: latencyMetrics.history)
+            if latencyThresholdTriggered || latencyOutlierTriggered {
+                result.append(.latency)
+            }
         }
 
         return result
     }
 
     private func isOutlier(value: Double, history: [Double]) -> Bool {
-        guard outlierDetectionEnabled else { return false }
         guard history.count >= minHistoryCount else { return false }
 
         let mean = history.reduce(0, +) / Double(history.count)
@@ -142,6 +173,12 @@ struct DynamicStatusItemView: View {
                 DiskStatusItemView(metrics: diskMetrics, threshold: diskThreshold)
             } else {
                 DiskTextItemView(metrics: diskMetrics, threshold: diskThreshold)
+            }
+        case .latency:
+            if latencyDisplayMode == .graph {
+                LatencyStatusItemView(metrics: latencyMetrics, threshold: latencyThreshold)
+            } else {
+                LatencyTextItemView(metrics: latencyMetrics, threshold: latencyThreshold)
             }
         }
     }
