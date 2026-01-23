@@ -5,11 +5,13 @@ actor MemoryMonitor {
     private let maxHistoryCount = 60
     private var history: [Double] = []
     private let pageSize: UInt64
+    private let hostPort: mach_port_t
 
     init() {
         // Get page size at init time - this is effectively constant after boot
         // Use getpagesize() which is the standard POSIX way
         self.pageSize = UInt64(getpagesize())
+        self.hostPort = mach_host_self()
     }
 
     func getMetrics() -> MemoryMetrics {
@@ -20,7 +22,7 @@ actor MemoryMonitor {
 
         let result = withUnsafeMutablePointer(to: &vmStats) { statsPtr in
             statsPtr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, intPtr, &count)
+                host_statistics64(hostPort, HOST_VM_INFO64, intPtr, &count)
             }
         }
 
@@ -36,7 +38,14 @@ actor MemoryMonitor {
         // Used memory = active + wired + compressed
         let usedBytes = activeBytes + wiredBytes + compressedBytes
 
-        let metrics = MemoryMetrics(
+        // Update history before constructing metrics so the current value is included
+        let usagePercentage = totalBytes > 0 ? Double(usedBytes) / Double(totalBytes) * 100 : 0
+        history.append(usagePercentage)
+        if history.count > maxHistoryCount {
+            history.removeFirst()
+        }
+
+        return MemoryMetrics(
             usedBytes: usedBytes,
             totalBytes: totalBytes,
             activeBytes: activeBytes,
@@ -45,13 +54,5 @@ actor MemoryMonitor {
             freeBytes: freeBytes,
             history: history
         )
-
-        // Update history
-        history.append(metrics.usagePercentage)
-        if history.count > maxHistoryCount {
-            history.removeFirst()
-        }
-
-        return metrics
     }
 }

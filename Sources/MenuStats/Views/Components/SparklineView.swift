@@ -39,7 +39,7 @@ struct SparklineView: View {
                 } else {
                     // Use thresholdValue if provided, otherwise fall back to last value
                     let colorValue = thresholdValue ?? values.last ?? 0
-                    color = ColorThresholds.graphColor(for: colorValue, threshold: threshold)
+                    color = ColorThresholds.color(for: colorValue, threshold: threshold)
                 }
 
                 context.stroke(path, with: .color(color), lineWidth: 1.5)

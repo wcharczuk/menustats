@@ -34,7 +34,7 @@ struct HistoryGraphView: View {
                     if let currentValue = values.last {
                         Text(valueFormatter(currentValue))
                             .font(.caption)
-                            .foregroundStyle(ColorThresholds.graphColor(for: currentValue, threshold: threshold))
+                            .foregroundStyle(ColorThresholds.color(for: currentValue, threshold: threshold))
                     }
                 }
             }
@@ -74,7 +74,7 @@ struct HistoryGraphView: View {
                     }
 
                     let currentValue = values.last ?? 0
-                    let color = ColorThresholds.graphColor(for: currentValue, threshold: threshold)
+                    let color = ColorThresholds.color(for: currentValue, threshold: threshold)
 
                     context.stroke(path, with: .color(color), lineWidth: 2)
 

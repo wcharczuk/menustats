@@ -32,7 +32,7 @@ struct CoreCell: View {
             GeometryReader { geometry in
                 let normalizedValue = min(core.usage / 100, 1.0)
                 let fillHeight = geometry.size.height * normalizedValue
-                let color = ColorThresholds.graphColor(for: core.usage, threshold: threshold)
+                let color = ColorThresholds.color(for: core.usage, threshold: threshold)
 
                 ZStack(alignment: .bottom) {
                     RoundedRectangle(cornerRadius: 2)
@@ -48,7 +48,7 @@ struct CoreCell: View {
             // Usage percentage
             Text(String(format: "%.0f%%", core.usage))
                 .font(.system(size: 8, design: .monospaced))
-                .foregroundStyle(ColorThresholds.graphColor(for: core.usage, threshold: threshold))
+                .foregroundStyle(ColorThresholds.color(for: core.usage, threshold: threshold))
         }
         .frame(width: 40)
     }

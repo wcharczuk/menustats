@@ -6,8 +6,10 @@ actor CPUMonitor {
     private var history: [Double] = []
     private var previousCPUInfo: [processor_cpu_load_info]?
     private var coreTypes: [CoreType] = []
+    private let hostPort: mach_port_t
 
     init() {
+        hostPort = mach_host_self()
         coreTypes = Self.detectCoreTypes()
     }
 
@@ -17,7 +19,7 @@ actor CPUMonitor {
         var numCPUInfo: mach_msg_type_number_t = 0
 
         let result = host_processor_info(
-            mach_host_self(),
+            hostPort,
             PROCESSOR_CPU_LOAD_INFO,
             &numCPUs,
             &cpuInfo,

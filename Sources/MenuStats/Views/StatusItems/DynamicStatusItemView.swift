@@ -61,18 +61,19 @@ struct DynamicStatusItemView: View {
             result.append(.memory)
         }
 
-        // Check Network
-        let maxNetworkMBps = max(
-            Double(networkMetrics.bytesSentPerSecond),
-            Double(networkMetrics.bytesReceivedPerSecond)
-        ) / (1024 * 1024)
+        // Check Network (use percentage of link speed to match threshold config)
+        let networkPercentage = networkMetrics.combinedPercentage
         let networkThresholdTriggered = useThresholds && (
-            networkThreshold.isCritical(maxNetworkMBps) ||
-            networkThreshold.isWarning(maxNetworkMBps)
+            networkThreshold.isCritical(networkPercentage) ||
+            networkThreshold.isWarning(networkPercentage)
         )
         let combinedHistory = zip(networkMetrics.sendHistory, networkMetrics.receiveHistory)
-            .map { Double(max($0, $1)) / (1024 * 1024) }
-        let networkOutlierTriggered = useOutliers && isOutlier(value: maxNetworkMBps, history: combinedHistory)
+            .map { sent, recv -> Double in
+                let linkSpeed = networkMetrics.linkSpeedBytesPerSecond
+                guard linkSpeed > 0 else { return 0 }
+                return min(Double(sent + recv) / Double(linkSpeed) * 100, 100)
+            }
+        let networkOutlierTriggered = useOutliers && isOutlier(value: networkPercentage, history: combinedHistory)
         if networkThresholdTriggered || networkOutlierTriggered {
             result.append(.network)
         }

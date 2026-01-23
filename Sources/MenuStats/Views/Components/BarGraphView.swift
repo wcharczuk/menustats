@@ -9,7 +9,7 @@ struct BarGraphView: View {
         GeometryReader { geometry in
             let normalizedValue = min(value / maxValue, 1.0)
             let fillHeight = geometry.size.height * normalizedValue
-            let color = ColorThresholds.graphColor(for: value, threshold: threshold)
+            let color = ColorThresholds.color(for: value, threshold: threshold)
 
             ZStack(alignment: .bottom) {
                 // Background

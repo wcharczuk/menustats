@@ -33,7 +33,7 @@ struct DiskPopover: View {
             VStack(alignment: .leading, spacing: 4) {
                 GeometryReader { geometry in
                     let usedWidth = geometry.size.width * (metrics.usagePercentage / 100)
-                    let color = ColorThresholds.graphColor(for: metrics.usagePercentage, threshold: settings.diskThreshold)
+                    let color = ColorThresholds.color(for: metrics.usagePercentage, threshold: settings.diskThreshold)
 
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
@@ -51,7 +51,7 @@ struct DiskPopover: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Circle()
-                        .fill(ColorThresholds.graphColor(for: metrics.usagePercentage, threshold: settings.diskThreshold))
+                        .fill(ColorThresholds.color(for: metrics.usagePercentage, threshold: settings.diskThreshold))
                         .frame(width: 10, height: 10)
 
                     Text("Used")

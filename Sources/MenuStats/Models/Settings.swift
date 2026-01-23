@@ -64,6 +64,10 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(latencyEnabled, forKey: "latencyEnabled") }
     }
 
+    var utcClockEnabled: Bool {
+        didSet { UserDefaults.standard.set(utcClockEnabled, forKey: "utcClockEnabled") }
+    }
+
     var dynamicEnabled: Bool {
         didSet { UserDefaults.standard.set(dynamicEnabled, forKey: "dynamicEnabled") }
     }
@@ -137,6 +141,7 @@ final class AppSettings {
         self.networkEnabled = defaults.object(forKey: "networkEnabled") as? Bool ?? true
         self.diskEnabled = defaults.object(forKey: "diskEnabled") as? Bool ?? true
         self.latencyEnabled = defaults.object(forKey: "latencyEnabled") as? Bool ?? true
+        self.utcClockEnabled = defaults.object(forKey: "utcClockEnabled") as? Bool ?? true
         self.dynamicEnabled = defaults.object(forKey: "dynamicEnabled") as? Bool ?? true
         self.dynamicDetectionMethod = DynamicDetectionMethod(rawValue: defaults.string(forKey: "dynamicDetectionMethod") ?? "") ?? .both
         self.dynamicStdDevThreshold = defaults.object(forKey: "dynamicStdDevThreshold") as? Double ?? 4.0

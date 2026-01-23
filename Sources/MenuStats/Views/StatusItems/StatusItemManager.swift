@@ -11,13 +11,30 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
     private var networkStatusItem: NSStatusItem?
     private var diskStatusItem: NSStatusItem?
     private var latencyStatusItem: NSStatusItem?
+    private var utcClockStatusItem: NSStatusItem?
     private var dynamicStatusItem: NSStatusItem?
 
     private var observationTask: Task<Void, Never>?
     private var preferencesWindow: NSWindow?
 
+    private let utcTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.timeStyle = .medium
+        formatter.dateStyle = .none
+        return formatter
+    }()
+
+    private let utcFullFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.timeStyle = .medium
+        formatter.dateStyle = .full
+        return formatter
+    }()
+
     private enum MenuType {
-        case cpu, memory, network, disk, latency, dynamic
+        case cpu, memory, network, disk, latency, dynamic, utcClock
     }
     private var menuTypeMap: [NSMenu: MenuType] = [:]
 
@@ -117,6 +134,20 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
             }
         }
 
+        // UTC Clock
+        if settings.utcClockEnabled {
+            if utcClockStatusItem == nil {
+                utcClockStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                setupStatusItemMenu(utcClockStatusItem, type: .utcClock)
+            }
+        } else {
+            if let item = utcClockStatusItem {
+                if let menu = item.menu { menuTypeMap.removeValue(forKey: menu) }
+                NSStatusBar.system.removeStatusItem(item)
+                utcClockStatusItem = nil
+            }
+        }
+
         // Dynamic (leftmost)
         if settings.dynamicEnabled {
             if dynamicStatusItem == nil {
@@ -153,6 +184,7 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         case .disk: populateDiskMenu(menu)
         case .latency: populateLatencyMenu(menu)
         case .dynamic: populateDynamicMenu(menu)
+        case .utcClock: populateUTCClockMenu(menu)
         }
     }
 
@@ -162,6 +194,7 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         updateNetworkStatusItem()
         updateDiskStatusItem()
         updateLatencyStatusItem()
+        updateUTCClockStatusItem()
         updateDynamicStatusItem()
     }
 
@@ -332,6 +365,19 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
         case .hidden:
             break
         }
+    }
+
+    private func updateUTCClockStatusItem() {
+        guard let statusItem = utcClockStatusItem else { return }
+
+        let timeString = utcTimeFormatter.string(from: Date())
+        let view = NSHostingView(rootView: UTCClockStatusItemView(timeString: timeString))
+        let fittingWidth = max(view.fittingSize.width, 38)
+        view.frame = NSRect(x: 0, y: 0, width: fittingWidth, height: 22)
+        statusItem.button?.subviews.forEach { $0.removeFromSuperview() }
+        statusItem.button?.addSubview(view)
+        statusItem.button?.title = ""
+        statusItem.length = fittingWidth
     }
 
     private func updateDynamicStatusItem() {
@@ -860,6 +906,19 @@ final class StatusItemManager: NSObject, NSMenuDelegate {
             latencyStats.isEnabled = false
             menu.addItem(latencyStats)
         }
+
+        addCommonMenuItems(to: menu)
+    }
+
+    private func populateUTCClockMenu(_ menu: NSMenu) {
+        let headerItem = NSMenuItem(title: "UTC Time", action: nil, keyEquivalent: "")
+        headerItem.isEnabled = false
+        menu.addItem(headerItem)
+
+        let fullTimeString = utcFullFormatter.string(from: Date()) + " UTC"
+        let timeItem = NSMenuItem(title: fullTimeString, action: nil, keyEquivalent: "")
+        timeItem.isEnabled = false
+        menu.addItem(timeItem)
 
         addCommonMenuItems(to: menu)
     }

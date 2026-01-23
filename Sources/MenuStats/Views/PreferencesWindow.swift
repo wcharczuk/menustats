@@ -34,6 +34,7 @@ struct PreferencesWindow: View {
 
 struct GeneralSettingsView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(SystemMonitor.self) private var systemMonitor
 
     var body: some View {
         @Bindable var settings = settings
@@ -45,6 +46,9 @@ struct GeneralSettingsView: View {
                     Text("2 seconds").tag(2.0 as TimeInterval)
                     Text("5 seconds").tag(5.0 as TimeInterval)
                     Text("10 seconds").tag(10.0 as TimeInterval)
+                }
+                .onChange(of: settings.updateInterval) { _, newValue in
+                    systemMonitor.updateInterval = newValue
                 }
             } header: {
                 Text("Display")
@@ -137,6 +141,15 @@ struct MetricsSettingsView: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Text("Latency")
+            }
+
+            Section {
+                Toggle("Enable UTC Clock", isOn: $settings.utcClockEnabled)
+                Text("Displays the current time in UTC")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("UTC Clock")
             }
         }
         .formStyle(.grouped)

@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             systemMonitor: systemMonitor
         )
 
+        systemMonitor.updateInterval = settings.updateInterval
         systemMonitor.startMonitoring()
     }
 

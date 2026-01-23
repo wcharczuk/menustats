@@ -16,7 +16,7 @@ final class SystemMonitor {
     private let latencyMonitor = LatencyMonitor()
 
     private var monitoringTask: Task<Void, Never>?
-    private var updateInterval: TimeInterval = 2.0
+    var updateInterval: TimeInterval = 2.0
 
     func startMonitoring() {
         stopMonitoring()
@@ -32,10 +32,6 @@ final class SystemMonitor {
     func stopMonitoring() {
         monitoringTask?.cancel()
         monitoringTask = nil
-    }
-
-    func setUpdateInterval(_ interval: TimeInterval) {
-        updateInterval = interval
     }
 
     private func updateMetrics() async {
